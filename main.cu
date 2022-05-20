@@ -97,7 +97,9 @@ free(B_h);
 free(C_h);
     /*************************************************************************/
 //INSERT CODE HERE
-cudaFree(C_d); cudaFree(A_d); cudaFree(B_d);   
+cudaFree(C_d); 
+cudaFree(A_d); 
+cudaFree(B_d);   
     /*************************************************************************/
     return 0;
 }
