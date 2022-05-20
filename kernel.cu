@@ -23,26 +23,34 @@ __global__ void mysgemm(int m, int n, int k, const float *A, const float *B, flo
     int Col = (blockIdx.x * TILE_SIZE) + threadIdx.x; 
 
     float Pvalue = 0;
-    for(int p = 0; p < (k-1)/TILE_SIZE + 1; ++p){      
-	if((Row < m) && (p*TILE_SIZE+threadIdx.x < k)){   
+    for(int p = 0; p < (k-1)/TILE_SIZE + 1; ++p)
+    {      
+    if((Row < m) && (p*TILE_SIZE+threadIdx.x < k))
+    {   
             ds_A[threadIdx.y][threadIdx.x] = A[Row*k + p*TILE_SIZE + threadIdx.x];  
-        } else {
+        }
+    else {
       	    ds_A[threadIdx.y][threadIdx.x] = 0.0;
         }
-        if((p*TILE_SIZE+threadIdx.y < k) && (Col < n )){      
+    if((p*TILE_SIZE+threadIdx.y < k) && (Col < n ))
+    {      
 	    ds_B[threadIdx.y][threadIdx.x] = B[(p*TILE_SIZE + threadIdx.y)*n + Col];  
-        } else {
+        } 
+    else {
 	    ds_B[threadIdx.y][threadIdx.x] = 0.0;
 	}
 	__syncthreads();
-        if((Row < m) && (Col < n)){      
-	 for(int i = 0; i < TILE_SIZE; ++i){
+    if((Row < m) && (Col < n))
+    {      
+    for(int i = 0; i < TILE_SIZE; ++i)
+    {
 	 	Pvalue += ds_A[threadIdx.y][i] * ds_B[i][threadIdx.x];
 	 }
 	}
 	__syncthreads();   
     } 
-    if((Row < m) && (Col < n)){
+    if((Row < m) && (Col < n))
+    {
 	C[Row*n + Col] = Pvalue;	
     }
     /*************************************************************************/
