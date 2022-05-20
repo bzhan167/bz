@@ -23,14 +23,14 @@ __global__ void mysgemm(int m, int n, int k, const float *A, const float *B, flo
     int Col = (blockIdx.x * TILE_SIZE) + threadIdx.x; 
 
     float Pvalue = 0;
-    for(int p = 0; p < (k-1)/TILE_SIZE + 1; ++p){      //k as width for M to check phase needed
-	if((Row < m) && (p*TILE_SIZE+threadIdx.x < k)){   //check Row and column are under A size
+    for(int p = 0; p < (k-1)/TILE_SIZE + 1; ++p){      
+	if((Row < m) && (p*TILE_SIZE+threadIdx.x < k)){   
             ds_A[threadIdx.y][threadIdx.x] = A[Row*k + p*TILE_SIZE + threadIdx.x];  
         //see A as horizontal blocks, Row*k(Acol) to get to the block, p*tilewidth+x for smaller
         } else {
       	    ds_A[threadIdx.y][threadIdx.x] = 0.0;
         }
-        if((p*TILE_SIZE+threadIdx.y < k) && (Col < n )){      //check under B size kxn
+        if((p*TILE_SIZE+threadIdx.y < k) && (Col < n )){      
 	    ds_B[threadIdx.y][threadIdx.x] = B[(p*TILE_SIZE + threadIdx.y)*n + Col];  
         } else {
 	    ds_B[threadIdx.y][threadIdx.x] = 0.0;
