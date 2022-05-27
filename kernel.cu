@@ -1,74 +1,67 @@
 #include <stdio.h>
 
-#define TILE_SIZE 16
+__global__ void histo_kernel(unsigned int *input, unsigned int *bins, unsigned int num_elements, unsigned int num_bins)
+{
 
-__global__ void mysgemm(int m, int n, int k, const float *A, const float *B, float* C) {
-
-    /********************************************************************
-     *
-     * Compute C = A x B
-     *   where A is a (m x k) matrix
-     *   where B is a (k x n) matrix
-     *   where C is a (m x n) matrix
-     *
-     * Use shared memory for tiling
-     *
-     ********************************************************************/
     /*************************************************************************/
     // INSERT KERNEL CODE HERE
-    __shared__ float ds_A[TILE_SIZE][TILE_SIZE];   
-    __shared__ float ds_B[TILE_SIZE][TILE_SIZE];    
-    
-    int Row = (blockIdx.y * TILE_SIZE) + threadIdx.y; 
-    int Col = (blockIdx.x * TILE_SIZE) + threadIdx.x; 
 
-    float Pvalue = 0;
-    for(int p = 0; p < (k-1)/TILE_SIZE + 1; ++p)
-    {      
-    if(Row < m && p*TILE_SIZE+threadIdx.x < k)
-    {   
-            ds_A[threadIdx.y][threadIdx.x] = A[Row*k + p*TILE_SIZE + threadIdx.x];  
-        }
-    else {
-      	    ds_A[threadIdx.y][threadIdx.x] = 0.0;
-        }
-    if(p*TILE_SIZE+threadIdx.y < k && Col < n )
-    {      
-	    ds_B[threadIdx.y][threadIdx.x] = B[(p*TILE_SIZE + threadIdx.y)*n + Col];  
-        } 
-    else {
-	    ds_B[threadIdx.y][threadIdx.x] = 0.0;
-	}
-	__syncthreads();
-    if(Row < m && Col < n)
-    {      
-    for(int i = 0; i < TILE_SIZE; ++i)
+    extern __shared__ int histo_private[];
+    if (threadIdx.x < num_bins)
+        histo_private[threadIdx.x] = 0;
+    __syncthreads();
+
+    // compute block's histogram
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int stride = blockDim.x * gridDim.x;
+    while (i < bins)
     {
-	 	Pvalue += ds_A[threadIdx.y][i] * ds_B[i][threadIdx.x];
-	 }
-	}
-	__syncthreads();   
-    } 
-    if(Row < m && Col < n)
-    {
-	C[Row*n + Col] = Pvalue;	
+        int a = histo_private[input[i]];
+        atomicAdd(&(histo_private[input[i]]), 1);
+        i += stride;
     }
+
+    // store to global histogram
+    __syncthreads();
+    if (threadIdx.x < histo_bins)
+        atomicAdd(&(histo[threadIdx.x]), histo_private[threadIdx.x]);
     /*************************************************************************/
 }
-void basicSgemm(int m, int n, int k, const float *A, const float *B, float *C)
+
+void histogram(unsigned int *input, unsigned int *bins, unsigned int num_elements, unsigned int num_bins)
 {
-    // Initialize thread block and kernel grid dimensions ---------------------
-    const unsigned int BLOCK_SIZE = TILE_SIZE;
+
     /*************************************************************************/
-    //INSERT CODE HERE
-    dim3 dim_grid(((n-1) / BLOCK_SIZE) + 1, ((m-1) / BLOCK_SIZE) + 1, 1);
-    dim3 dim_block(BLOCK_SIZE, BLOCK_SIZE, 1);
-    /*************************************************************************/
-    // Invoke CUDA kernel -----------------------------------------------------
-    /*************************************************************************/
-    //INSERT CODE HERE
-    mysgemm<<<dim_grid, dim_block>>>(m, n, k, A, B, C);	
+    // INSERT CODE HERE
+    int BLOCK_SIZE = (int)num_bins;
+    BLOCK_SIZE = 512;
+    dim3 dim_grid, dim_block;
+    dim_block.x = BLOCK_SIZE;
+    dim_block.y = dim_block.z = 1;
+    dim_grid.x = 1 + (num_elements - 1) / BLOCK_SIZE;
+    dim_grid.y = dim_grid.z = 1;
+
+    // create an array of uint8_t to be converted into an array of int
+    uint8_t *bins_unpacked;
+    cudaMalloc((void **)&bins_unpacked, 4 * num_bins * sizeof(uint8_t));
+
+    // unpack the input uint8_t array
+    unpack<<<dim_grid, dim_block>>>(bins, bins_unpacked, num_bins);
+
+    // need an int version of bins_d
+    int *bins_int_d;
+    cudaMalloc((void **)&bins_int_d, num_bins * sizeof(int));
+
+    // convert the uint8_t array to an int array
+    convert<<<dim_grid, dim_block>>>(bins_unpacked, bins_int_d, num_bins);
+
+    // run kernel and enforce saturation requirements
+    int histo_private_size = num_bins;
+    histo_kernel<<<dim_grid, dim_block, histo_private_size>>>(input, num_elements, bins_int_d, num_bins);
+    enforce_saturation<<<dim_grid, dim_block>>>(bins_int_d, num_bins);
+
+    // convert the int array back to uint8_t
+    convert_back<<<dim_grid, dim_block>>>(bins_int_d, bins, num_bins);
+
     /*************************************************************************/
 }
-
-
