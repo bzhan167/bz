@@ -5,7 +5,7 @@ __global__ void histo_kernel(unsigned int *input, unsigned int *bins, unsigned i
     /*************************************************************************/
     // INSERT KERNEL CODE HERE
     extern __shared__ int histo_private[];
-    for (threadIdx.x < num_bins){
+    for (int i =threadIdx.x < num_bins){
     histo_private[threadIdx.x] = 0;
 }
     __syncthreads();
