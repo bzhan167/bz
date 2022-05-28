@@ -2,12 +2,11 @@
 
 __global__ void histo_kernel(unsigned int *input, unsigned int *bins, unsigned int num_elements, unsigned int num_bins)
 {
-
     /*************************************************************************/
     // INSERT KERNEL CODE HERE
     extern __shared__ int histo_private[];
-    if (threadIdx.x < num_bins)
-        histo_private[threadIdx.x] = 0;
+    for (threadIdx.x < num_bins)
+    histo_private[threadIdx.x] = 0;
     __syncthreads();
     // compute block's histogram
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -20,8 +19,8 @@ __global__ void histo_kernel(unsigned int *input, unsigned int *bins, unsigned i
     }
     // store to global histogram
     __syncthreads();
-    if (threadIdx.x < histo_bins)
-        atomicAdd(&(histo[threadIdx.x]), histo_private[threadIdx.x]);
+    while (threadIdx.x < histo_bins)
+    atomicAdd(&(histo[threadIdx.x]), histo_private[threadIdx.x]);
     /*************************************************************************/
 }
 void histogram(unsigned int *input, unsigned int *bins, unsigned int num_elements, unsigned int num_bins)
